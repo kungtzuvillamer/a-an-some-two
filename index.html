@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yummy English Fun!</title>
+    <link href="https://fonts.googleapis.com/css2?family=Andika&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --text-color: #2d3436;
+            --success: #2ecc71;
+            --error: #e74c3c;
+            --accent: #0984e3;
+        }
+
+        body, html {
+            margin: 0; padding: 0;
+            height: 100%; width: 100%;
+            font-family: 'Andika', sans-serif;
+            overflow: hidden;
+            background: linear-gradient(135deg, #fff9e6 0%, #e3f2fd 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end; /* Pushes everything to the bottom */
+            align-items: center;
+        }
+
+        /* Moving Background */
+        .food-bg {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .floating-emoji {
+            position: absolute;
+            font-size: 60px;
+            opacity: 0.15;
+            animation: move linear infinite;
+        }
+
+        @keyframes move {
+            0% { transform: translate(-10vw, 100vh) rotate(0deg); }
+            100% { transform: translate(110vw, -10vh) rotate(360deg); }
+        }
+
+        /* Feedback positioned lower than before */
+        #feedback-corner {
+            position: fixed;
+            top: 10%; 
+            right: 5%;
+            font-size: 120px;
+            z-index: 100;
+            visibility: hidden;
+        }
+
+        /* 1. GAME AREA (Middle-Bottom) */
+        #game-container {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .game-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 30px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px 40px;
+            border-radius: 40px;
+            border: 6px solid #fab1a0;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .sentence-strip {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .drop-zone {
+            min-width: 280px;
+            height: 100px;
+            border-bottom: 10px solid #dfe6e9;
+            font-size: 75px;
+            font-weight: bold;
+            text-align: center;
+            line-height: 100px;
+            color: var(--accent);
+        }
+
+        .drop-zone.correct {
+            border-bottom-color: transparent;
+            background-color: #dff9fb;
+            color: var(--success);
+            border-radius: 20px;
+        }
+
+        .food-label {
+            font-size: 80px;
+            color: var(--text-color);
+        }
+
+        .food-photo {
+            width: 220px;
+            height: 220px;
+            object-fit: contain;
+        }
+
+        /* 2. OPTIONS SHELF (Very Bottom) */
+        #options-dock {
+            width: 100%;
+            height: 25vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 30px;
+            background: rgba(255, 255, 255, 0.6);
+            border-top: 4px solid white;
+            padding-bottom: 20px;
+        }
+
+        .drag-card {
+            background: #ffffff;
+            font-size: 70px;
+            padding: 15px 50px;
+            border: 5px solid var(--text-color);
+            border-radius: 20px;
+            cursor: grab;
+            box-shadow: 0 8px 0px var(--text-color);
+            user-select: none;
+            touch-action: none;
+        }
+
+        /* Next Button positioned within reach */
+        .btn-next {
+            margin-bottom: 15px;
+            padding: 12px 40px;
+            font-size: 28px;
+            background: #00b894;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            visibility: hidden;
+            box-shadow: 0 5px 0px #006241;
+            font-weight: bold;
+        }
+
+        #start-overlay {
+            position: fixed;
+            inset: 0;
+            background: #fff9e6;
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-15px); }
+            40% { transform: translateX(15px); }
+            60% { transform: translateX(-15px); }
+            80% { transform: translateX(15px); }
+        }
+        .error-shake { animation: shake 0.4s ease-in-out; }
+    </style>
+</head>
+<body>
+
+<div class="food-bg" id="food-bg"></div>
+
+<audio id="snd-correct" src="https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3"></audio>
+<audio id="snd-wrong" src="https://assets.mixkit.co/active_storage/sfx/2020/2020-preview.mp3"></audio>
+
+<div id="start-overlay">
+    <button class="drag-card" onclick="beginGame()">START GAME ➔</button>
+</div>
+
+<div id="feedback-corner"></div>
+
+<div id="game-container">
+    <button id="next-btn" class="btn-next" onclick="nextQuestion()">NEXT ➔</button>
+    <div class="game-row">
+        <div class="sentence-strip">
+            <div id="drop-target" class="drop-zone" ondrop="onDrop(event)" ondragover="event.preventDefault()"></div>
+            <div id="vocab-text" class="food-label"></div>
+        </div>
+        <img id="food-img" class="food-photo" src="" alt="food">
+    </div>
+</div>
+
+<div id="options-dock"></div>
+
+<script>
+    const foodIcons = ["🍕","🍔","🍟","🌭","🥤","🧃","🍦","🍩","🍎"];
+    
+    const questions = [
+        { word: "ice cream", answer: "some", options: ["a", "some"], img: "https://ik.imagekit.io/3cmdu72xx/ice%20cream.png?updatedAt=1777437910120" },
+        { word: "hot dog", answer: "a", options: ["a", "two"], img: "https://ik.imagekit.io/3cmdu72xx/a%20hot%20dog.png?updatedAt=1777437910111" },
+        { word: "hot dogs", answer: "two", options: ["a", "two"], img: "https://ik.imagekit.io/3cmdu72xx/two%20hot%20dogs.png?updatedAt=1777437910138" },
+        { word: "milk", answer: "some", options: ["a", "some"], img: "https://ik.imagekit.io/3cmdu72xx/milk.png?updatedAt=1777437910046" },
+        { word: "hamburger", answer: "a", options: ["a", "two"], img: "https://ik.imagekit.io/3cmdu72xx/a%20hamburger.png?updatedAt=1777437910159" },
+        { word: "juice", answer: "some", options: ["an", "some"], img: "https://ik.imagekit.io/3cmdu72xx/juice.png?updatedAt=1777437910079" }
+    ];
+
+    let currentIndex = 0;
+    let gameOrder = [];
+
+    function createBg() {
+        const bg = document.getElementById('food-bg');
+        for(let i=0; i<10; i++) {
+            const el = document.createElement('div');
+            el.className = 'floating-emoji';
+            el.innerText = foodIcons[Math.floor(Math.random()*foodIcons.length)];
+            el.style.left = (Math.random() * 90) + 'vw';
+            el.style.animationDuration = (Math.random() * 10 + 15) + 's';
+            el.style.animationDelay = (Math.random() * 5) + 's';
+            bg.appendChild(el);
+        }
+    }
+    createBg();
+
+    function beginGame() {
+        if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+        document.getElementById('start-overlay').style.display = 'none';
+        gameOrder = [...questions].sort(() => Math.random() - 0.5);
+        loadSlide();
+    }
+
+    function loadSlide() {
+        const item = gameOrder[currentIndex];
+        const dock = document.getElementById('options-dock');
+        const target = document.getElementById('drop-target');
+        const label = document.getElementById('vocab-text');
+        const img = document.getElementById('food-img');
+        const corner = document.getElementById('feedback-corner');
+        const nextBtn = document.getElementById('next-btn');
+
+        target.innerText = "";
+        target.className = "drop-zone";
+        corner.style.visibility = "hidden";
+        nextBtn.style.visibility = "hidden";
+        label.innerText = item.word;
+        img.src = item.img;
+
+        const sortedOpts = [...item.options].sort((a, b) => a.length - b.length);
+        dock.innerHTML = '';
+        sortedOpts.forEach(opt => {
+            const btn = document.createElement('div');
+            btn.className = 'drag-card';
+            btn.draggable = true;
+            btn.innerText = opt;
+            btn.addEventListener('dragstart', (e) => e.dataTransfer.setData("text", e.target.innerText));
+            dock.appendChild(btn);
+        });
+    }
+
+    function onDrop(ev) {
+        ev.preventDefault();
+        const data = ev.dataTransfer.getData("text");
+        const correctAns = gameOrder[currentIndex].answer;
+        const target = ev.target;
+        const corner = document.getElementById('feedback-corner');
+        const nextBtn = document.getElementById('next-btn');
+
+        if (data === correctAns) {
+            target.innerText = data;
+            target.className = "drop-zone correct";
+            corner.innerText = "✅";
+            corner.style.visibility = "visible";
+            document.getElementById('snd-correct').play();
+            nextBtn.style.visibility = "visible";
+        } else {
+            target.classList.add('error-shake');
+            corner.innerText = "❌";
+            corner.style.visibility = "visible";
+            document.getElementById('snd-wrong').play();
+            setTimeout(() => {
+                target.classList.remove('error-shake');
+                corner.style.visibility = "hidden";
+            }, 800);
+        }
+    }
+
+    function nextQuestion() {
+        currentIndex++;
+        if (currentIndex < gameOrder.length) {
+            loadSlide();
+        } else {
+            document.body.innerHTML = `
+                <div style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#dff9fb;">
+                    <div style="font-size:150px;">🏆</div>
+                    <button class="drag-card" onclick="location.reload()" style="font-size: 40px;">PLAY AGAIN</button>
+                </div>`;
+        }
+    }
+</script>
+
+</body>
+</html>\
